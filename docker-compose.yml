@@ -1,0 +1,42 @@
+networks:
+  k6:
+
+services:
+  influxdb:
+    image: influxdb:1.8
+    networks:
+      - k6
+    ports:
+      - '8086:8086'
+    volumes:
+      - influxdb-storage:/var/lib/influxdb
+    environment:
+      - INFLUXDB_DB=db0
+      - INFLUXDB_ADMIN_USER=${INFLUXDB_USERNAME}
+      - INFLUXDB_ADMIN_PASSWORD=${INFLUXDB_PASSWORD}
+
+  grafana:
+    image: grafana/grafana:latest
+    networks:
+      - k6
+    ports:
+      - '3000:3000'
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana-provisioning/:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USERNAME}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+
+  k6:
+    image: grafana/k6:latest
+    networks:
+      - k6
+    volumes:
+      - ./samples/:/samples
+      - ./scripts/:/scripts
+    entrypoint: ["sh", "-c"]
+    command: ["until nc -z influxdb 8086; do echo waiting for influxdb; sleep 2; done; k6 run --out influxdb=http://${INFLUXDB_USERNAME}:${INFLUXDB_PASSWORD}@influxdb:8086/db0 /scripts/samples_test.js"]
+volumes:
+  influxdb-storage:
+  grafana-storage:
